@@ -1,0 +1,30 @@
+# Environments & Secrets
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker files (explicitly omitted per submission rules)
+Dockerfile*
+docker-compose*
+compose.yaml
+compose.yml
