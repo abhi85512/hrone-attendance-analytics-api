@@ -61,7 +61,8 @@ python sample_seed.py
 ```bash
 uvicorn app.main:app --port 8000 --reload
 ```
-Once started, interactive API documentation is available at:
+Once started, interactive access and API documentation are available at:
+- **Interactive Executive Dashboard**: [http://localhost:8000/](http://localhost:8000/) (Real-time analytics, concurrent race simulator, and live explain plan inspector)
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
