@@ -491,8 +491,14 @@ def regularize_attendance(emp_code: str, date: str, body: RegularizeIn):
         "reason": body.reason,
         "changes": changes,
     }
+    filter_q: dict = {"_id": rec["_id"]}
+    if "history" in rec and rec["history"] is not None:
+        filter_q["history"] = {"$size": len(rec["history"])}
+    else:
+        filter_q["$or"] = [{"history": {"$exists": False}}, {"history": None}, {"history": []}]
+
     result = db.attendance_logs.find_one_and_update(
-        {"_id": rec["_id"]},
+        filter_q,
         {
             "$set": {
                 "status": new_status, "punch_in": new_pi, "punch_out": new_po,
@@ -726,13 +732,22 @@ def department_trend(
     if db.employees.count_documents({"department": department}) == 0:
         raise HTTPException(404, "Unknown department")
 
+    from_dt = datetime(from_d.year, from_d.month, from_d.day, tzinfo=timezone.utc)
+    to_dt = datetime(to_d.year, to_d.month, to_d.day, tzinfo=timezone.utc) + timedelta(days=1)
+
     pipeline = [
         {"$match": {"date": {"$gte": from_date, "$lte": to_date}}},
         {"$lookup": {"from": "employees", "localField": "emp_code", "foreignField": "emp_code", "as": "emp"}},
         {"$unwind": "$emp"},
         {"$match": {"emp.department": department}},
+        {"$project": {
+            "dt": {"$dateFromString": {"dateString": "$date"}},
+            "status": 1,
+            "half_day": 1,
+            "late_minutes": 1,
+        }},
         {"$group": {
-            "_id": "$date",
+            "_id": "$dt",
             "present_count": {"$sum": {"$cond": [
                 {"$in": ["$status", ["PRESENT", "WFH", "ON_DUTY"]]},
                 {"$cond": [{"$eq": ["$half_day", True]}, 0.5, 1]},
@@ -740,10 +755,13 @@ def department_trend(
             ]}},
             "late_count": {"$sum": {"$cond": [{"$gt": ["$late_minutes", 0]}, 1, 0]}},
         }},
-        # Gap-fill: one row per calendar day (use $densify as required by spec)
-        {"$densify": {"field": "_id", "range": {"step": 1, "unit": "day", "bounds": [from_date, to_date]}}},
-        {"$fill": {"output": {"present_count": {"value": 0}, "late_count": {"value": 0}}}},
-        {"$sort": {"_id": ASCENDING}},
+        {"$densify": {"field": "_id", "range": {"step": 1, "unit": "day", "bounds": [from_dt, to_dt]}}},
+        {"$project": {
+            "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$_id"}},
+            "present_count": {"$ifNull": ["$present_count", 0]},
+            "late_count": {"$ifNull": ["$late_count", 0]},
+        }},
+        {"$sort": {"date": ASCENDING}},
     ]
     rows = list(db.attendance_logs.aggregate(pipeline))
 
@@ -754,7 +772,7 @@ def department_trend(
 
     items_raw = []
     for row in rows:
-        d_str = row["_id"] if isinstance(row["_id"], str) else row["_id"].strftime("%Y-%m-%d")
+        d_str = row.get("date") or (row["_id"].strftime("%Y-%m-%d") if isinstance(row["_id"], (datetime, date_type)) else str(row["_id"]))
         if not (from_date <= d_str <= to_date):
             continue
         d = date_type.fromisoformat(d_str)

@@ -8,19 +8,20 @@ The system handles daily attendance tracking (punch-in/punch-out), overnight shi
 
 ## Features
 
-- **Employee Management**: Create and list employees with department filtering and 1-indexed pagination.
+- **Employee Management**: Create and list employees with department filtering and 1-indexed pagination (Rule R10).
 - **Punch-In / Punch-Out**:
-  - Millisecond-precision epoch API with second-level truncation (Rule R1).
-  - Multi-shift support (General, Evening, Night) with overnight shift crossing detection (Rule R2).
-  - Grace period enforcement (15 mins) and automatic penalty status computation (Rule R3).
-  - Concurrency-safe: Unique compound indexes prevent duplicate punch-ins; atomic `find_one_and_update` prevents duplicate punch-outs.
+  - Millisecond-precision epoch API with second-level truncation and overnight shift boundary resolution (Rule R1).
+  - 10-minute grace period enforcement and exact late-minutes floor calculation (Rule R2).
+  - Overtime calculation (minimum 30 minutes threshold) (Rule R3).
+  - Work hours calculation with `ROUND_HALF_UP` (Rule R4) and half-day status computation (Rule R5).
+  - Concurrency-safe: Unique compound index prevents duplicate punch-ins; atomic `find_one_and_update` prevents duplicate punch-outs.
 - **Attendance Corrections**:
-  - Full audit trail using MongoDB `$push` to retain complete edit history without overwriting previous versions (Rule R5).
+  - Full audit trail using MongoDB `$push` to retain complete edit history without overwriting previous versions.
 - **Advanced Analytics via Aggregations**:
-  - **Employee Monthly Summary**: Total days, present days, late count, overtime hours (using `ROUND_HALF_UP`), and attendance percentage (Rule R8).
+  - **Employee Monthly Summary**: Working days, present days, late count, overtime, and attendance percentage (Rules R6, R7, R8).
   - **Department Summary**: Preserves inactive/zero-log employees using left-outer `$lookup` from the `employees` collection (Rule R9).
-  - **Late Leaderboard**: Standard competition ranking (`1, 2, 2, 4`) using `$setWindowFields` with `$rank` and tie preservation (Rule R7).
-  - **Department 30-Day Trend**: Gap-filled daily attendance metrics using MongoDB `$densify` (Rule R10).
+  - **Late Leaderboard**: Standard competition ranking (`1, 2, 2, 4`) using `$setWindowFields` with `$rank` and tie preservation.
+  - **Department Trend**: Gap-filled daily attendance metrics using MongoDB `$densify` with 7-day moving averages.
 - **Explainability Endpoint**: `GET /admin/explain/{endpoint}` returns query execution stats and index usage.
 
 ---
